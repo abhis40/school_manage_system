@@ -1,0 +1,620 @@
+{% extends 'attendance/base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="attempt-test-container" id="testContainer" style="display: none;">
+    <!-- Test Header -->
+    <div class="test-header">
+        <div class="container">
+            <div class="row align-items-center">
+                <div class="col-md-8">
+                    <h1 class="test-title">{{ test.title }}</h1>
+                    <div class="test-meta">
+                        <span class="badge bg-primary">{{ test.get_subject_display }}</span>
+                        <span class="badge bg-info">{{ test.class_name }}</span>
+                        <span class="badge bg-secondary">Total Marks: {{ test.total_marks }}</span>
+                    </div>
+                </div>
+                <div class="col-md-4 text-end">
+                    <div class="timer-container">
+                        <i class="bi bi-clock"></i>
+                        <span id="timer" class="timer">{{ test.time_limit }}:00</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Progress Bar -->
+    <div class="progress-container">
+        <div class="container">
+            <div class="progress" style="height: 8px;">
+                <div id="progress-bar" class="progress-bar" role="progressbar" style="width: 0%"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Test Content -->
+    <div class="container mt-4">
+        <form method="post" id="testForm" class="test-form">
+            {% csrf_token %}
+            <input type="hidden" name="fullscreen_exit" id="fullscreen_exit" value="false">
+            <div class="questions-navigation mb-4">
+                <div class="nav-buttons">
+                    <button type="button" id="prevQuestion" class="btn btn-outline-primary" disabled>
+                        <i class="bi bi-arrow-left"></i> Previous
+                    </button>
+                    <div class="question-indicators">
+                        {% for question in test.questions.all %}
+                        <span class="question-dot" data-question="{{ forloop.counter }}"></span>
+                        {% endfor %}
+                    </div>
+                    <button type="button" id="nextQuestion" class="btn btn-outline-primary">
+                        Next <i class="bi bi-arrow-right"></i>
+                    </button>
+                </div>
+            </div>
+
+            {% for question in test.questions.all %}
+            <div class="question-card {% if not forloop.first %}d-none{% endif %}" data-question="{{ forloop.counter }}">
+                <div class="question-header">
+                    <div class="question-info">
+                        <h3 class="question-number">Question {{ forloop.counter }}</h3>
+                        <span class="question-marks">{{ question.marks }} marks</span>
+                    </div>
+                </div>
+                <div class="question-body">
+                    <p class="question-text">{{ question.question_text }}</p>
+                    <div class="options-container">
+                        <div class="option">
+                            <input type="radio" name="question_{{ question.id }}" id="option1_{{ question.id }}" value="1" required>
+                            <label for="option1_{{ question.id }}">
+                                <span class="option-marker">A</span>
+                                <span class="option-text">{{ question.option1 }}</span>
+                            </label>
+                        </div>
+                        <div class="option">
+                            <input type="radio" name="question_{{ question.id }}" id="option2_{{ question.id }}" value="2">
+                            <label for="option2_{{ question.id }}">
+                                <span class="option-marker">B</span>
+                                <span class="option-text">{{ question.option2 }}</span>
+                            </label>
+                        </div>
+                        <div class="option">
+                            <input type="radio" name="question_{{ question.id }}" id="option3_{{ question.id }}" value="3">
+                            <label for="option3_{{ question.id }}">
+                                <span class="option-marker">C</span>
+                                <span class="option-text">{{ question.option3 }}</span>
+                            </label>
+                        </div>
+                        <div class="option">
+                            <input type="radio" name="question_{{ question.id }}" id="option4_{{ question.id }}" value="4">
+                            <label for="option4_{{ question.id }}">
+                                <span class="option-marker">D</span>
+                                <span class="option-text">{{ question.option4 }}</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary btn-lg">
+                    <i class="bi bi-check-circle"></i> Submit Test
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+    .attempt-test-container {
+        background-color: #f8f9fa;
+        min-height: 100vh;
+        padding-bottom: 3rem;
+    }
+
+    .test-header {
+        background: linear-gradient(135deg, #1a237e 0%, #3949ab 100%);
+        color: white;
+        padding: 1.5rem 0;
+        margin-bottom: 0;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .test-title {
+        font-size: 1.75rem;
+        margin: 0;
+        font-weight: 600;
+    }
+
+    .test-meta {
+        margin-top: 0.5rem;
+    }
+
+    .test-meta .badge {
+        font-size: 0.85rem;
+        padding: 0.4rem 0.8rem;
+        margin-right: 0.5rem;
+        font-weight: 500;
+    }
+
+    .timer-container {
+        background: rgba(255, 255, 255, 0.15);
+        padding: 0.75rem 1.5rem;
+        border-radius: 50px;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.75rem;
+        backdrop-filter: blur(5px);
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+
+    .timer {
+        font-size: 1.25rem;
+        font-weight: 600;
+        font-family: 'Courier New', monospace;
+    }
+
+    .progress-container {
+        background: white;
+        padding: 1rem 0;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+
+    .progress {
+        border-radius: 10px;
+        background-color: #e9ecef;
+        overflow: hidden;
+    }
+
+    .progress-bar {
+        background: linear-gradient(90deg, #3949ab 0%, #1a237e 100%);
+        transition: width 0.3s ease;
+    }
+
+    .questions-navigation {
+        background: white;
+        padding: 1rem;
+        border-radius: 10px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+
+    .nav-buttons {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+    }
+
+    .question-indicators {
+        display: flex;
+        gap: 0.5rem;
+        align-items: center;
+    }
+
+    .question-dot {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        background: #e9ecef;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .question-dot.active {
+        background: #3949ab;
+        transform: scale(1.2);
+    }
+
+    .question-dot.answered {
+        background: #4caf50;
+    }
+
+    .question-card {
+        background: white;
+        border-radius: 10px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        margin-bottom: 1.5rem;
+        overflow: hidden;
+        border: 1px solid #eee;
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    .question-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+
+    .question-header {
+        background: #f8f9fa;
+        padding: 1rem 1.5rem;
+        border-bottom: 1px solid #eee;
+    }
+
+    .question-info {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+    }
+
+    .question-number {
+        font-size: 1.1rem;
+        color: #1a237e;
+        margin: 0;
+        font-weight: 600;
+    }
+
+    .question-marks {
+        background: #e8eaf6;
+        color: #3949ab;
+        padding: 0.25rem 0.75rem;
+        border-radius: 50px;
+        font-size: 0.85rem;
+        font-weight: 500;
+    }
+
+    .question-body {
+        padding: 1.5rem;
+    }
+
+    .question-text {
+        font-size: 1.1rem;
+        color: #2c3e50;
+        margin-bottom: 1.5rem;
+        line-height: 1.6;
+    }
+
+    .options-container {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+    }
+
+    .option {
+        position: relative;
+    }
+
+    .option input[type="radio"] {
+        position: absolute;
+        opacity: 0;
+    }
+
+    .option label {
+        display: flex;
+        align-items: center;
+        padding: 1rem 1.25rem;
+        background: #f8f9fa;
+        border: 2px solid #e9ecef;
+        border-radius: 10px;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .option label:hover {
+        background: #e8eaf6;
+        border-color: #c5cae9;
+    }
+
+    .option input[type="radio"]:checked + label {
+        background: #e8eaf6;
+        border-color: #3949ab;
+    }
+
+    .option-marker {
+        width: 32px;
+        height: 32px;
+        background: #e9ecef;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 600;
+        color: #495057;
+        margin-right: 1rem;
+        font-size: 0.9rem;
+        transition: all 0.2s;
+    }
+
+    .option input[type="radio"]:checked + label .option-marker {
+        background: #3949ab;
+        color: white;
+    }
+
+    .option-text {
+        flex: 1;
+        font-size: 1rem;
+        color: #2c3e50;
+    }
+
+    .form-actions {
+        text-align: center;
+        margin-top: 2rem;
+    }
+
+    .btn-primary {
+        background: #3949ab;
+        border: none;
+        padding: 1rem 3rem;
+        font-size: 1.1rem;
+        font-weight: 500;
+        border-radius: 50px;
+        box-shadow: 0 4px 12px rgba(57, 73, 171, 0.2);
+        transition: all 0.3s ease;
+    }
+
+    .btn-primary:hover {
+        background: #1a237e;
+        transform: translateY(-2px);
+        box-shadow: 0 6px 16px rgba(57, 73, 171, 0.3);
+    }
+
+    .btn-outline-primary {
+        color: #3949ab;
+        border-color: #3949ab;
+        padding: 0.5rem 1.5rem;
+        font-size: 0.95rem;
+        border-radius: 50px;
+        transition: all 0.3s ease;
+    }
+
+    .btn-outline-primary:hover:not(:disabled) {
+        background: #3949ab;
+        color: white;
+        transform: translateY(-1px);
+    }
+
+    .btn-outline-primary:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+
+    @media (max-width: 768px) {
+        .test-header {
+            padding: 1rem 0;
+        }
+
+        .test-title {
+            font-size: 1.4rem;
+        }
+
+        .timer-container {
+            margin-top: 1rem;
+            justify-content: center;
+        }
+
+        .question-card {
+            margin: 1rem 0;
+        }
+
+        .option label {
+            padding: 0.75rem 1rem;
+        }
+
+        .option-marker {
+            width: 28px;
+            height: 28px;
+        }
+
+        .btn-primary {
+            padding: 0.75rem 2rem;
+            font-size: 1rem;
+        }
+    }
+</style>
+
+<div id="startTestContainer" class="start-test-container">
+    <div class="start-test-content">
+        <h2>Ready to Start Test?</h2>
+        <p>Click the button below to start the test. The test will enter fullscreen mode.</p>
+        <p class="warning-text">Warning: Exiting fullscreen or switching tabs will automatically submit your test.</p>
+        <button id="startTestBtn" class="btn btn-primary btn-lg">
+            <i class="bi bi-play-circle"></i> Start Test
+        </button>
+    </div>
+</div>
+
+<style>
+.start-test-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 80vh;
+    background: #f8f9fa;
+}
+
+.start-test-content {
+    text-align: center;
+    background: white;
+    padding: 2rem;
+    border-radius: 10px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    max-width: 500px;
+    width: 90%;
+}
+
+.start-test-content h2 {
+    color: #1a237e;
+    margin-bottom: 1rem;
+}
+
+.warning-text {
+    color: #d32f2f;
+    font-size: 0.9rem;
+    margin: 1rem 0;
+}
+
+#startTestBtn {
+    margin-top: 1rem;
+    padding: 1rem 3rem;
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const startTestBtn = document.getElementById('startTestBtn');
+    const testContainer = document.getElementById('testContainer');
+    const startTestContainer = document.getElementById('startTestContainer');
+
+    // Function to enter fullscreen mode
+    async function enterFullscreen() {
+        try {
+            const elem = document.documentElement;
+            if (elem.requestFullscreen) {
+                await elem.requestFullscreen();
+            } else if (elem.webkitRequestFullscreen) {
+                await elem.webkitRequestFullscreen();
+            } else if (elem.msRequestFullscreen) {
+                await elem.msRequestFullscreen();
+            } else if (elem.mozRequestFullScreen) {
+                await elem.mozRequestFullScreen();
+            }
+        } catch (err) {
+            console.error('Error entering fullscreen:', err);
+        }
+    }
+
+    // Function to handle fullscreen exit
+    function handleFullscreenChange() {
+        if (!document.fullscreenElement && 
+            !document.webkitFullscreenElement && 
+            !document.mozFullScreenElement && 
+            !document.msFullscreenElement) {
+            // User has exited fullscreen, set the hidden field and submit
+            document.getElementById('fullscreen_exit').value = 'true';
+            document.getElementById('testForm').submit();
+        }
+    }
+
+    // Function to handle tab switching
+    function handleVisibilityChange() {
+        if (document.visibilityState === 'hidden') {
+            document.getElementById('fullscreen_exit').value = 'true';
+            document.getElementById('testForm').submit();
+        }
+    }
+
+    // Add event listeners for fullscreen and visibility changes
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+    document.addEventListener('mozfullscreenchange', handleFullscreenChange);
+    document.addEventListener('MSFullscreenChange', handleFullscreenChange);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    // Start test button click handler
+    startTestBtn.addEventListener('click', async () => {
+        await enterFullscreen();
+        startTestContainer.style.display = 'none';
+        testContainer.style.display = 'block';
+    });
+
+    const questions = document.querySelectorAll('.question-card');
+    const dots = document.querySelectorAll('.question-dot');
+    const prevBtn = document.getElementById('prevQuestion');
+    const nextBtn = document.getElementById('nextQuestion');
+    let currentQuestion = 1;
+    const totalQuestions = questions.length;
+
+    // Initialize progress bar and first dot
+    updateProgress();
+    dots[0].classList.add('active');
+
+    // Update progress bar
+    function updateProgress() {
+        const progress = (currentQuestion - 1) / (totalQuestions - 1) * 100;
+        document.getElementById('progress-bar').style.width = `${progress}%`;
+    }
+
+    // Show question
+    function showQuestion(questionNumber) {
+        questions.forEach(q => {
+            q.classList.add('d-none');
+            if (q.dataset.question == questionNumber) {
+                q.classList.remove('d-none');
+            }
+        });
+
+        dots.forEach(dot => {
+            dot.classList.remove('active');
+        });
+        dots[questionNumber - 1].classList.add('active');
+
+        currentQuestion = questionNumber;
+        updateProgress();
+
+        // Update navigation buttons
+        prevBtn.disabled = currentQuestion === 1;
+        nextBtn.disabled = currentQuestion === totalQuestions;
+    }
+
+    // Navigation button handlers
+    prevBtn.addEventListener('click', () => {
+        if (currentQuestion > 1) {
+            showQuestion(currentQuestion - 1);
+        }
+    });
+
+    nextBtn.addEventListener('click', () => {
+        if (currentQuestion < totalQuestions) {
+            showQuestion(currentQuestion + 1);
+        }
+    });
+
+    // Question dot navigation
+    dots.forEach((dot, index) => {
+        dot.addEventListener('click', () => {
+            showQuestion(index + 1);
+        });
+    });
+
+    // Mark questions as answered when options are selected
+    document.querySelectorAll('input[type="radio"]').forEach(radio => {
+        radio.addEventListener('change', function() {
+            const questionNumber = this.closest('.question-card').dataset.question;
+            dots[questionNumber - 1].classList.add('answered');
+        });
+    });
+
+    // Timer functionality
+    const timerElement = document.getElementById('timer');
+    let timeLeft = parseInt(timerElement.textContent) * 60; // Convert minutes to seconds
+
+    const timer = setInterval(() => {
+        timeLeft--;
+        const minutes = Math.floor(timeLeft / 60);
+        const seconds = timeLeft % 60;
+        timerElement.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+
+        if (timeLeft <= 300) { // Last 5 minutes
+            timerElement.style.color = '#ff5252';
+        }
+
+        if (timeLeft <= 0) {
+            clearInterval(timer);
+            document.getElementById('testForm').submit();
+        }
+    }, 1000);
+
+    // Form submission
+    document.getElementById('testForm').addEventListener('submit', function(e) {
+        const unansweredQuestions = [];
+        questions.forEach((q, index) => {
+            const questionInputs = q.querySelectorAll('input[type="radio"]');
+            const answered = Array.from(questionInputs).some(input => input.checked);
+            if (!answered) {
+                unansweredQuestions.push(index + 1);
+            }
+        });
+
+        if (unansweredQuestions.length > 0) {
+            e.preventDefault();
+            const confirmation = confirm(`You have not answered question(s) ${unansweredQuestions.join(', ')}. Do you still want to submit?`);
+            if (confirmation) {
+                this.submit();
+            }
+        }
+    });
+});
+</script>
+{% endblock %} 

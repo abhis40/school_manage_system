@@ -1,0 +1,729 @@
+{% extends 'attendance/base.html' %}
+{% load static %}
+{% load attendance_tags %}
+
+{% block title %}Attendance History - {{ class_name }}{% endblock %}
+
+{% block content %}
+<div class="attendance-container">
+    <!-- Header Section -->
+    <div class="attendance-header">
+        <div class="header-content">
+            <h1><i class="bi bi-calendar-check"></i> Attendance History</h1>
+            <p class="class-info">{{ class_name }}</p>
+        </div>
+        <div class="header-actions">
+            <button class="btn btn-primary" id="downloadPdf">
+                <i class="bi bi-file-earmark-pdf"></i> Download Report
+            </button>
+            <div class="view-toggle btn-group">
+                <button class="btn btn-outline-primary active" data-view="table">
+                    <i class="bi bi-table"></i> Table View
+                </button>
+                <button class="btn btn-outline-primary" data-view="calendar">
+                    <i class="bi bi-calendar3"></i> Calendar View
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Statistics Cards -->
+    <div class="stats-section">
+        <div class="stat-card">
+            <div class="stat-icon">
+                <i class="bi bi-people-fill"></i>
+            </div>
+            <div class="stat-content">
+                <h3>Total Students</h3>
+                <p class="stat-value">{{ students.count }}</p>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon">
+                <i class="bi bi-calendar-check"></i>
+            </div>
+            <div class="stat-content">
+                <h3>Total Days</h3>
+                <p class="stat-value">{{ attendance_history|length }}</p>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon">
+                <i class="bi bi-graph-up"></i>
+            </div>
+            <div class="stat-content">
+                <h3>Average Attendance</h3>
+                <p class="stat-value">{{ average_attendance }}%</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Table View -->
+    <div class="view-section" id="tableView">
+        <div class="card">
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Present</th>
+                                <th>Absent</th>
+                                <th>Percentage</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for date, data in attendance_history.items %}
+                            <tr>
+                                <td>
+                                    <div class="date-info">
+                                        <span class="date">{{ data.display_date }}</span>
+                                        <span class="day">{{ data.date|date:"D" }}</span>
+                                    </div>
+                                </td>
+                                <td>
+                                    <span class="badge bg-success">{{ data.present_count }}</span>
+                                </td>
+                                <td>
+                                    <span class="badge bg-danger">{{ data.total_count|add:"-"|add:data.present_count }}</span>
+                                </td>
+                                <td>
+                                    <div class="progress" style="height: 8px;">
+                                        <div class="progress-bar bg-primary" role="progressbar" 
+                                             style="width: {{ data.percentage }}%"
+                                             aria-valuenow="{{ data.percentage }}" 
+                                             aria-valuemin="0" 
+                                             aria-valuemax="100">
+                                        </div>
+                                    </div>
+                                    <small class="text-muted">{{ data.percentage }}%</small>
+                                </td>
+                                <td>
+                                    <button class="btn btn-sm btn-info view-details" data-date="{{ data.date }}">
+                                        <i class="bi bi-eye"></i> Details
+                                    </button>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="5" class="text-center py-4">
+                                    <div class="empty-state">
+                                        <i class="bi bi-calendar-x"></i>
+                                        <p>No attendance records found</p>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Calendar View -->
+    <div class="view-section" id="calendarView" style="display: none;">
+        <div class="card">
+            <div class="card-body">
+                <div class="calendar-container">
+                    <div class="calendar-header">
+                        <button class="btn btn-outline-primary" id="prevMonth">
+                            <i class="bi bi-chevron-left"></i>
+                        </button>
+                        <h2 id="currentMonth"></h2>
+                        <button class="btn btn-outline-primary" id="nextMonth">
+                            <i class="bi bi-chevron-right"></i>
+                        </button>
+                    </div>
+                    <div class="calendar-grid">
+                        <div class="calendar-days">
+                            <div>Sun</div>
+                            <div>Mon</div>
+                            <div>Tue</div>
+                            <div>Wed</div>
+                            <div>Thu</div>
+                            <div>Fri</div>
+                            <div>Sat</div>
+                        </div>
+                        <div class="calendar-dates" id="calendarDates"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Details Modal -->
+<div class="modal fade" id="detailsModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-info-circle"></i> Attendance Details
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Student</th>
+                                <th>Status</th>
+                                <th>Marked By</th>
+                            </tr>
+                        </thead>
+                        <tbody id="detailsTableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Date Range Modal -->
+<div class="modal fade" id="dateRangeModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-calendar-range"></i> Select Date Range
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label for="startDate" class="form-label">Start Date</label>
+                    <input type="date" class="form-control" id="startDate">
+                </div>
+                <div class="mb-3">
+                    <label for="endDate" class="form-label">End Date</label>
+                    <input type="date" class="form-control" id="endDate">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="downloadWithRange">
+                    <i class="bi bi-download"></i> Download
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .attendance-container {
+        padding: 2rem;
+        max-width: 1400px;
+        margin: 0 auto;
+        padding-bottom: 3rem;
+    }
+
+    .attendance-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 2rem;
+        flex-wrap: wrap;
+        gap: 1rem;
+    }
+
+    .header-content h1 {
+        font-size: 2rem;
+        color: #2c3e50;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin: 0;
+    }
+
+    .class-info {
+        color: #7f8c8d;
+        margin: 0.5rem 0 0;
+    }
+
+    .header-actions {
+        display: flex;
+        gap: 1rem;
+        align-items: center;
+    }
+
+    .stats-section {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 1.5rem;
+        margin-bottom: 2rem;
+    }
+
+    .stat-card {
+        background: white;
+        border-radius: 15px;
+        padding: 1.5rem;
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        transition: transform 0.2s;
+    }
+
+    .stat-card:hover {
+        transform: translateY(-5px);
+    }
+
+    .stat-icon {
+        width: 50px;
+        height: 50px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+    }
+
+    .stat-card:nth-child(1) .stat-icon {
+        background: #e3f2fd;
+        color: #1976d2;
+    }
+
+    .stat-card:nth-child(2) .stat-icon {
+        background: #f3e5f5;
+        color: #7b1fa2;
+    }
+
+    .stat-card:nth-child(3) .stat-icon {
+        background: #e8f5e9;
+        color: #2e7d32;
+    }
+
+    .stat-content h3 {
+        margin: 0;
+        font-size: 1rem;
+        color: #6c757d;
+    }
+
+    .stat-value {
+        margin: 0.5rem 0 0;
+        font-size: 1.5rem;
+        font-weight: 600;
+        color: #2c3e50;
+    }
+
+    .card {
+        border: none;
+        border-radius: 15px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+
+    .table {
+        margin-bottom: 0;
+    }
+
+    .table th {
+        background: #f8f9fa;
+        font-weight: 600;
+        color: #2c3e50;
+    }
+
+    .date-info {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .date {
+        font-weight: 500;
+        color: #2c3e50;
+    }
+
+    .day {
+        font-size: 0.875rem;
+        color: #7f8c8d;
+    }
+
+    .badge {
+        padding: 0.5rem 1rem;
+        font-weight: 500;
+    }
+
+    .progress {
+        background: #f8f9fa;
+        border-radius: 4px;
+        margin-bottom: 0.25rem;
+    }
+
+    .empty-state {
+        text-align: center;
+        color: #7f8c8d;
+    }
+
+    .empty-state i {
+        font-size: 2rem;
+        margin-bottom: 0.5rem;
+        color: #dee2e6;
+    }
+
+    .calendar-container {
+        padding: 0.5rem;
+        max-width: 800px;
+        margin: 0 auto;
+        overflow: hidden;
+    }
+
+    .calendar-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1rem;
+    }
+
+    .calendar-header h2 {
+        margin: 0;
+        color: #2c3e50;
+        font-size: 1.25rem;
+    }
+
+    .calendar-grid {
+        display: grid;
+        gap: 0.5rem;
+        overflow: hidden;
+    }
+
+    .calendar-days {
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        text-align: center;
+        font-weight: 500;
+        color: #6c757d;
+        padding: 0.25rem 0;
+        border-bottom: 1px solid #eee;
+        font-size: 0.875rem;
+    }
+
+    .calendar-dates {
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        gap: 0.25rem;
+        overflow: hidden;
+    }
+
+    .calendar-date {
+        aspect-ratio: 1;
+        padding: 0.25rem;
+        border: 1px solid #f0f0f0;
+        border-radius: 8px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.2s;
+        font-size: 0.875rem;
+        background-color: #fff;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .calendar-date:hover {
+        border-color: #e0e7ff;
+        background-color: #f5f7ff;
+        transform: translateY(-2px);
+    }
+
+    .calendar-date.has-attendance {
+        background-color: #fafafa;
+        border-color: #e6e6e6;
+    }
+
+    .calendar-date.has-attendance::before {
+        content: '';
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        height: 3px;
+        background: linear-gradient(to right, #e0e7ff, #c7d2fe);
+        opacity: 0.7;
+    }
+
+    .calendar-date .date-number {
+        font-size: 1rem;
+        font-weight: 500;
+        color: #374151;
+    }
+
+    .calendar-date .attendance-info {
+        font-size: 0.75rem;
+        color: #6b7280;
+        margin-top: 0.125rem;
+        opacity: 0.8;
+    }
+
+    .calendar-date .attendance-percentage {
+        font-size: 0.7rem;
+        color: #4f46e5;
+        margin-top: 0.125rem;
+        font-weight: 500;
+        opacity: 0.8;
+    }
+
+    .calendar-date.empty {
+        background-color: #fafafa;
+        border-color: #f0f0f0;
+        cursor: default;
+        opacity: 0.5;
+    }
+
+    .calendar-date.empty:hover {
+        transform: none;
+        background-color: #fafafa;
+        border-color: #f0f0f0;
+    }
+
+    .calendar-date.today {
+        border: 2px solid #4f46e5;
+        font-weight: 600;
+    }
+
+    .calendar-date.today .date-number {
+        color: #4f46e5;
+    }
+
+    .modal-content {
+        border: none;
+        border-radius: 15px;
+    }
+
+    .modal-header {
+        border-bottom: 1px solid #eee;
+        padding: 1.5rem;
+    }
+
+    .modal-title {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        color: #2c3e50;
+        font-weight: 600;
+    }
+
+    .modal-body {
+        padding: 1.5rem;
+    }
+
+    .modal-footer {
+        border-top: 1px solid #eee;
+        padding: 1.5rem;
+    }
+
+    .view-section {
+        overflow: hidden;
+        margin-bottom: 2rem;
+    }
+
+    @media (max-width: 768px) {
+        .attendance-container {
+            padding: 1rem;
+        }
+
+        .attendance-header {
+            flex-direction: column;
+            align-items: flex-start;
+        }
+
+        .header-actions {
+            width: 100%;
+            flex-direction: column;
+        }
+
+        .stats-section {
+            grid-template-columns: 1fr;
+        }
+
+        .table-responsive {
+            margin: 0 -1rem;
+        }
+    }
+</style>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // View Toggle
+        const viewButtons = document.querySelectorAll('.view-toggle .btn');
+        const tableView = document.getElementById('tableView');
+        const calendarView = document.getElementById('calendarView');
+
+        viewButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                viewButtons.forEach(btn => btn.classList.remove('active'));
+                this.classList.add('active');
+
+                if (this.dataset.view === 'table') {
+                    tableView.style.display = 'block';
+                    calendarView.style.display = 'none';
+                } else {
+                    tableView.style.display = 'none';
+                    calendarView.style.display = 'block';
+                }
+            });
+        });
+
+        // Details Modal
+        const detailsModal = new bootstrap.Modal(document.getElementById('detailsModal'));
+        const viewDetailButtons = document.querySelectorAll('.view-details');
+        const detailsTableBody = document.getElementById('detailsTableBody');
+
+        viewDetailButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                const date = this.dataset.date;
+                const attendanceData = {{ attendance_history_json|safe }};
+                const dateData = attendanceData[date];
+
+                if (dateData) {
+                    let html = '';
+                    dateData.records.forEach(record => {
+                        html += `
+                            <tr>
+                                <td>${record.student}</td>
+                                <td>
+                                    <span class="badge ${record.status ? 'bg-success' : 'bg-danger'}">
+                                        ${record.status ? 'Present' : 'Absent'}
+                                    </span>
+                                </td>
+                                <td>${record.marked_by}</td>
+                            </tr>
+                        `;
+                    });
+                    detailsTableBody.innerHTML = html;
+                    detailsModal.show();
+                }
+            });
+        });
+
+        // PDF Download
+        const downloadPdfBtn = document.getElementById('downloadPdf');
+        const dateRangeModal = new bootstrap.Modal(document.getElementById('dateRangeModal'));
+        const downloadWithRangeBtn = document.getElementById('downloadWithRange');
+
+        downloadPdfBtn.addEventListener('click', function() {
+            dateRangeModal.show();
+        });
+
+        downloadWithRangeBtn.addEventListener('click', function() {
+            const startDate = document.getElementById('startDate').value;
+            const endDate = document.getElementById('endDate').value;
+            window.location.href = `{% url 'download_attendance_pdf' class_id %}?start_date=${startDate}&end_date=${endDate}`;
+            dateRangeModal.hide();
+        });
+
+        // Calendar View
+        const calendarDates = document.getElementById('calendarDates');
+        const currentMonth = document.getElementById('currentMonth');
+        const prevMonthBtn = document.getElementById('prevMonth');
+        const nextMonthBtn = document.getElementById('nextMonth');
+        const attendanceData = {{ attendance_history_json|safe }};
+
+        let currentDate = new Date();
+        let currentMonthDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+
+        function updateCalendar() {
+            const year = currentMonthDate.getFullYear();
+            const month = currentMonthDate.getMonth();
+            const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 
+                              'July', 'August', 'September', 'October', 'November', 'December'];
+            
+            currentMonth.textContent = `${monthNames[month]} ${year}`;
+
+            // Clear previous dates
+            calendarDates.innerHTML = '';
+
+            // Get first day of month and total days
+            const firstDay = new Date(year, month, 1).getDay();
+            const totalDays = new Date(year, month + 1, 0).getDate();
+
+            // Add empty cells for days before first day of month
+            for (let i = 0; i < firstDay; i++) {
+                const emptyCell = document.createElement('div');
+                emptyCell.className = 'calendar-date empty';
+                calendarDates.appendChild(emptyCell);
+            }
+
+            // Add dates
+            for (let day = 1; day <= totalDays; day++) {
+                const date = new Date(year, month, day);
+                const dateStr = date.toISOString().split('T')[0];
+                const dateData = attendanceData[dateStr];
+
+                const dateCell = document.createElement('div');
+                
+                // Get current date in YYYY-MM-DD format for comparison
+                const now = new Date();
+                const currentDateStr = now.getFullYear() + '-' + 
+                    String(now.getMonth() + 1).padStart(2, '0') + '-' + 
+                    String(now.getDate()).padStart(2, '0');
+                
+                const isToday = dateStr === currentDateStr;
+                const isPast = dateStr < currentDateStr;
+                
+                dateCell.className = 'calendar-date';
+                if (isToday) dateCell.className += ' today';
+                if (dateData && (isPast || isToday)) dateCell.className += ' has-attendance';
+                
+                let html = `
+                    <div class="date-number">${day}</div>
+                `;
+
+                if (dateData && (isPast || isToday)) {
+                    html += `
+                        <div class="attendance-info">
+                            ${dateData.present_count}/${dateData.total_count}
+                        </div>
+                        <div class="attendance-percentage">
+                            ${dateData.percentage}%
+                        </div>
+                    `;
+                }
+
+                dateCell.innerHTML = html;
+                dateCell.addEventListener('click', function() {
+                    if (dateData) {
+                        const detailsModal = new bootstrap.Modal(document.getElementById('detailsModal'));
+                        const detailsTableBody = document.getElementById('detailsTableBody');
+                        
+                        let html = '';
+                        dateData.records.forEach(record => {
+                            html += `
+                                <tr>
+                                    <td>${record.student}</td>
+                                    <td>
+                                        <span class="badge ${record.status ? 'bg-success' : 'bg-danger'}">
+                                            ${record.status ? 'Present' : 'Absent'}
+                                        </span>
+                                    </td>
+                                    <td>${record.marked_by}</td>
+                                </tr>
+                            `;
+                        });
+                        detailsTableBody.innerHTML = html;
+                        detailsModal.show();
+                    }
+                });
+
+                calendarDates.appendChild(dateCell);
+            }
+        }
+
+        prevMonthBtn.addEventListener('click', function() {
+            currentMonthDate.setMonth(currentMonthDate.getMonth() - 1);
+            updateCalendar();
+        });
+
+        nextMonthBtn.addEventListener('click', function() {
+            currentMonthDate.setMonth(currentMonthDate.getMonth() + 1);
+            updateCalendar();
+        });
+
+        // Initial calendar render
+        updateCalendar();
+    });
+</script>
+{% endblock %} 
